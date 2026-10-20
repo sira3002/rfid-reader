@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Centrální Dashboard Čtečky</title>
+    <style>
+        :root {
+            --primary: #0288D1;
+            --danger: #d32f2f;
+            --success: #388E3C;
+            --dark: #1e1e1e;
+            --card: #2c2c2c;
+            --text: #f0f0f0;
+            --border: #444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            margin: 0; padding: 0; background-color: var(--dark); color: var(--text);
+        }
+        header {
+            background-color: #111; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border);
+        }
+        header h1 { margin: 0; font-size: 18px; color: var(--primary); }
+        .badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+        .badge-ok { background: var(--success); color: white; }
+        .badge-err { background: var(--danger); color: white; }
+        
+        nav { display: flex; background: #1a1a1a; border-bottom: 1px solid var(--border); }
+        nav button {
+            flex: 1; padding: 14px 5px; background: none; border: none; border-bottom: 3px solid transparent; color: #aaa; font-weight: bold; font-size: 14px; cursor: pointer;
+        }
+        nav button.active { border-bottom-color: var(--primary); color: white; background: #252525; }
+        
+        .container { padding: 15px; max-width: 700px; margin: auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .card { background: var(--card); border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid var(--border); }
+        .card h2 { margin-top: 0; font-size: 16px; color: #ff9800; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        
+        button.btn {
+            width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; color: white; cursor: pointer; margin-top: 10px; transition: opacity 0.2s;
+        }
+        button.btn:active { opacity: 0.7; }
+        .btn-primary { background: var(--primary); }
+        .btn-danger { background: var(--danger); }
+        .btn-success { background: var(--success); }
+        .btn-mute { background: #5c6bc0; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: #888; }
+        .file-act button { padding: 6px 10px; margin-right: 5px; border-radius: 5px; border: none; color: white; font-weight: bold; cursor: pointer; font-size: 12px; }
+        
+        textarea {
+            width: 100%; height: 180px; background: #181818; color: #4CAF50; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 13px; resize: vertical;
+        }
+        .tags { font-size: 12px; color: #aaa; margin: 6px 0; }
+        .tags code { background: #444; padding: 2px 4px; border-radius: 4px; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 id="readerTitle">ČTEČKA: ---</h1>
+        <div id="sdBadge" class="badge badge-ok">SD: OK</div>
+    </header>
+
+    <nav>
+        <button class="active" onclick="openTab(event, 'prehled')">⚙️ Přehled</button>
+        <button onclick="openTab(event, 'displej')">📺 Displej</button>
+        <button onclick="openTab(event, 'soubory')">📁 Soubory</button>
+    </nav>
+
+    <div class="container">
+        <!-- ZÁLOŽKA 1: PŘEHLED -->
+        <div id="prehled" class="tab-content active">
+            <div class="card">
+                <h2>Stav zařízení</h2>
+                <div style="font-size:14px; line-height:1.8;">
+                    <div>Čas na čtečce: <b id="rtcTime">--:--:--</b></div>
+                    <div>Aktuální režim: <b id="sysState" style="color:#4CAF50;">NORMAL</b></div>
+                </div>
+                <button class="btn btn-primary" onclick="syncTime()">🕒 Synchronizovat čas z mobilu</button>
+            </div>
+
+            <div class="card">
+                <h2>Rychlé akce</h2>
+                <button id="btnMute" class="btn btn-mute" onclick="toggleMute()">🔕 ZTLUMIT ZVUK</button>
+                <button id="btnPorucha" class="btn btn-danger" onclick="togglePorucha()">🚨 PŘEPNOUT PORUCHU</button>
+                <button class="btn" style="background:#555;" onclick="restartSystem()">🔄 Restartovat čtečku</button>
+            </div>
+        </div>
+
+        <!-- ZÁLOŽKA 2: DISPLEJ & PRESETY -->
+        <div id="displej" class="tab-content">
+            <div class="card">
+                <h2>Šablony zpráv (display_cfg.txt)</h2>
+                <p style="font-size:13px; color:#ccc; margin-top:0;">
+                    Zde můžete upravit obsah souboru <code>display_cfg.txt</code>. Na prvním řádku <code>AKTIVNI=Nazev</code> zvolte aktivní sekci.
+                </p>
+                
+                <div class="tags">
+                    Zástupné značky: <code>{JMENO}</code> <code>{PRIJMENI}</code> <code>{OSLOVENI}</code> <code>{ODDIL}</code> <code>{ROLE}</code> <code>{DIETA}</code>
+                </div>
+
+                <textarea id="cfgEditor" spellcheck="false"></textarea>
+                <button class="btn btn-primary" onclick="saveDisplayConfig()">💾 ULOŽIT DO ČTEČKY</button>
+            </div>
+        </div>
+
+        <!-- ZÁLOŽKA 3: SPRÁVCE SOUBORŮ -->
+        <div id="soubory" class="tab-content">
+            <div class="card">
+                <h2>Nahrát soubor na SD kartu</h2>
+                <input type="file" id="fileInput" style="width:100%; margin-bottom:10px; color:#aaa;">
+                <button class="btn btn-primary" onclick="uploadFile()">⬆️ Nahrát na SD</button>
+                <div id="uploadStatus" style="font-size:13px; margin-top:8px;"></div>
+            </div>
+
+            <div class="card">
+                <h2>Soubory na SD kartě</h2>
+                <button class="btn" style="background:#444; margin-top:0;" onclick="fetchFiles()">🔄 Obnovit seznam souborů</button>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Soubor</th>
+                            <th>Velikost</th>
+                            <th>Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fileList">
+                        <tr><td colspan="3">Načítám...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openTab(evt, name) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            document.getElementById(name).classList.add('active');
+            evt.currentTarget.classList.add('active');
+
+            if(name === 'soubory') fetchFiles();
+            if(name === 'displej') loadDisplayConfig();
+        }
+
+        window.onload = function() {
+            updateStatus();
+            syncTime();
+            setInterval(updateStatus, 3000);
+        };
+
+        async function updateStatus() {
+            try {
+                const r = await fetch('/api/status');
+                const d = await r.json();
+                document.getElementById('readerTitle').innerText = 'ČTEČKA: ' + d.readerId;
+                document.getElementById('rtcTime').innerText = d.time;
+                
+                const st = document.getElementById('sysState');
+                st.innerText = d.state;
+                st.style.color = (d.state === 'PORUCHA') ? '#d32f2f' : '#4CAF50';
+
+                const sdB = document.getElementById('sdBadge');
+                sdB.innerText = d.sdActive ? 'SD: OK' : 'SD: CHYBA';
+                sdB.className = 'badge ' + (d.sdActive ? 'badge-ok' : 'badge-err');
+
+                const btnM = document.getElementById('btnMute');
+                btnM.innerText = d.muted ? '🔊 ZAPNOUT ZVUK' : '🔕 ZTLUMIT ZVUK';
+                btnM.style.background = d.muted ? '#555' : '#5c6bc0';
+            } catch(e){}
+        }
+
+        async function syncTime() {
+            const ts = Math.floor(Date.now() / 1000);
+            await fetch('/api/settime', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'timestamp=' + ts
+            });
+            updateStatus();
+        }
+
+        async function toggleMute() {
+            await fetch('/api/mute');
+            updateStatus();
+        }
+
+        async function togglePorucha() {
+            const r = await fetch('/api/porucha');
+            const msg = await r.text();
+            alert(msg);
+            updateStatus();
+        }
+
+        async function restartSystem() {
+            if(confirm("Opravdu restartovat čtečku?")) {
+                await fetch('/api/restart', { method: 'POST' });
+                alert("Restartuji...");
+            }
+        }
+
+        // --- Šablony displeje ---
+        async function loadDisplayConfig() {
+            const r = await fetch('/api/display_cfg/get');
+            const txt = await r.text();
+            document.getElementById('cfgEditor').value = txt;
+        }
+
+        async function saveDisplayConfig() {
+            const content = document.getElementById('cfgEditor').value;
+            const r = await fetch('/api/display_cfg/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'cfg_content=' + encodeURIComponent(content)
+            });
+            const res = await r.text();
+            alert(res === "OK" ? "Šablony úspěšně uloženy!" : "Chyba: " + res);
+        }
+
+        // --- Soubory ---
+        async function fetchFiles() {
+            const tbody = document.getElementById('fileList');
+            try {
+                const r = await fetch('/api/fs/list');
+                const files = await r.json();
+                tbody.innerHTML = '';
+                if(files.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3">Žádné soubory na SD kartě</td></tr>';
+                    return;
+                }
+                files.forEach(f => {
+                    const kb = (f.size / 1024).toFixed(1) + ' KB';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><b>${f.name}</b></td>
+                        <td>${kb}</td>
+                        <td class="file-act">
+                            <button style="background:#0288D1;" onclick="window.location.href='/api/fs/download?file=${encodeURIComponent(f.name)}'">⬇️</button>
+                            <button style="background:#d32f2f;" onclick="deleteFile('${f.name}')">🗑️</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="3">Chyba při načítání souborů</td></tr>';
+            }
+        }
+
+        async function deleteFile(name) {
+            if(confirm("Opravdu smazat " + name + "?")) {
+                await fetch('/api/fs/delete?file=' + encodeURIComponent(name), { method: 'DELETE' });
+                fetchFiles();
+            }
+        }
+
+        async function uploadFile() {
+            const inp = document.getElementById('fileInput');
+            const st = document.getElementById('uploadStatus');
+            if(!inp.files.length) { alert("Vyberte soubor!"); return; }
+
+            const file = inp.files[0];
+            const fd = new FormData();
+            fd.append('file', file, file.name);
+
+            st.style.color = '#ff9800';
+            st.innerText = 'Nahrávám ' + file.name + '...';
+
+            try {
+                const r = await fetch('/api/fs/upload', { method: 'POST', body: fd });
+                if(r.ok) {
+                    st.style.color = '#4CAF50';
+                    st.innerText = 'Soubor úspěšně nahrán!';
+                    inp.value = '';
+                    fetchFiles();
+                } else throw new Error();
+            } catch(e) {
+                st.style.color = '#d32f2f';
+                st.innerText = 'Nahrávání selhalo.';
+            }
+        }
+    </script>
+</body>
+</html>

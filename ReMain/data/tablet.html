@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kiosk - Táborová Kuchyně</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #121212; color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; transition: background 0.4s ease; }
+        .header { background: rgba(0,0,0,0.4); padding: 1.5vh 3vw; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid rgba(255,255,255,0.1); }
+        .title { font-size: 3vw; color: #aaa; font-weight: bold; }
+        .meal { font-size: 3vw; color: #ff9800; font-weight: bold; }
+        .content { flex: 1; display: flex; padding: 2vw; align-items: center; justify-content: center; }
+        .photo-area { 
+    width: 35%; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+}
+
+.photo-area img { 
+    width: 45vh;             /* Pevná šířka odvozená od výšky obrazovky */
+    height: 50vh;            /* Pevná výška – vytvoří dokonalý čtverec */
+    object-fit: cover;       /* Ořízne okraje na střed bez deformace obličeje */
+    border-radius: 20px; 
+    border: 6px solid #fff; 
+    box-shadow: 0 15px 35px rgba(0,0,0,0.8); 
+}
+        .info-area { width: 65%; padding-left: 3vw; }
+        .greeting { font-size: 7vw; font-weight: bold; margin-bottom: 1vh; line-height: 1.1; }
+        .team { font-size: 3.5vw; color: #ddd; margin-bottom: 1.5vh; }
+        .diet-warning { font-size: 3.8vw; font-weight: bold; padding: 1.5vh 2vw; background: #d32f2f; color: white; border-radius: 12px; display: inline-block; animation: shake 0.6s infinite; margin-bottom: 1.5vh; }
+        .status-msg { font-size: 3.2vw; font-weight: bold; padding: 1.2vh 2vw; border-radius: 10px; background: #1976D2; display: inline-block; margin-bottom: 1vh; }
+        .portion-counter { font-size: 3.5vw; font-weight: bold; padding: 1.5vh 2vw; background: rgba(255,255,255,0.15); border-radius: 10px; display: inline-block; border: 2px solid rgba(255,255,255,0.3); color: #fff;}
+        .rating-area { text-align: center; width: 100%; }
+        .rating-step { font-size: 4vw; color: #ff9800; font-weight: bold; margin-bottom: 1vh; }
+        .stars { display: flex; justify-content: center; gap: 2vw; font-size: 11vw; cursor: pointer; margin-top: 1vh; user-select: none; }
+        .star { color: #555; transition: color 0.15s, transform 0.15s; }
+        .thanks { font-size: 7vw; color: #4CAF50; font-weight: bold; text-align: center; width: 100%; line-height: 1.2; }
+        .idle-text { font-size: 5.5vw; color: #666; text-align: center; width: 100%; font-weight: bold; line-height: 1.3; }
+        .btn-submit { display: none; margin: 3vh auto 0 auto; font-size: 3.5vw; padding: 1.8vh 5vw; background: #4CAF50; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        @keyframes shake { 0%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} 100%{transform:translateX(0);} }
+    </style>
+</head>
+<body>
+<div class="header">
+    <div class="title" id="mode-title">TÁBOROVÝ SYSTÉM</div>
+    <div class="meal" id="meal-name">---</div>
+</div>
+
+<div class="content" id="main">
+    <div class="idle-text">Načítám systém...</div>
+</div>
+
+<script>
+    let lastId = -1;
+    let isInteracting = false; 
+    let currentUid = ""; 
+    let selectedStarsCurrent = 0;
+    let multiRatings = {};
+
+    window.selectStars = function(n) {
+        selectedStarsCurrent = n;
+        for(let i = 1; i <= 5; i++) {
+            let s = document.getElementById('star' + i);
+            if(s) {
+                s.innerText = (i <= n) ? '★' : '☆';
+                s.style.color = (i <= n) ? '#FFD700' : '#555';
+            }
+        }
+        let btn = document.getElementById('btnSubmit');
+        if(btn) btn.style.display = 'block';
+    }
+
+    window.selectMultiStar = function(item, idx, n) {
+        multiRatings[item] = n;
+        for(let i = 1; i <= 5; i++) {
+            let s = document.getElementById(`star_${idx}_${i}`);
+            if(s) {
+                s.innerText = (i <= n) ? '★' : '☆';
+                s.style.color = (i <= n) ? '#FFD700' : '#555';
+            }
+        }
+        let btnN = document.getElementById(`btn_nemel_${idx}`);
+        if(btnN) { btnN.style.background = '#444'; btnN.style.borderColor = '#666'; }
+        checkMultiComplete();
+    };
+
+    window.setNemel = function(item, idx) {
+        multiRatings[item] = "NEMĚL";
+        for(let i = 1; i <= 5; i++) {
+            let s = document.getElementById(`star_${idx}_${i}`);
+            if(s) {
+                s.innerText = '☆';
+                s.style.color = '#555';
+            }
+        }
+        let btnN = document.getElementById(`btn_nemel_${idx}`);
+        if(btnN) { btnN.style.background = '#d32f2f'; btnN.style.borderColor = '#ff5252'; }
+        checkMultiComplete();
+    };
+
+    function checkMultiComplete() {
+        let allSelected = Object.values(multiRatings).every(v => v !== null);
+        let btn = document.getElementById('btnSubmit');
+        if(btn) btn.style.display = allSelected ? 'block' : 'none';
+    }
+
+    window.handleRatingSubmit = function() {
+        if(currentUid === "") return;
+
+        let starsPayload = "";
+        if (Object.keys(multiRatings).length > 0) {
+            let arr = [];
+            for(let [item, val] of Object.entries(multiRatings)) {
+                arr.push(`${item}:${val}`);
+            }
+            starsPayload = arr.join(' | ');
+        } else {
+            starsPayload = selectedStarsCurrent;
+        }
+
+        if(!starsPayload || starsPayload === "0") return;
+
+        isInteracting = true;
+        document.getElementById('main').innerHTML = '<div class="rating-area"><div class="thanks">HODNOCENÍ ODESLÁNO!<br><span style="font-size:4.5vw; color:#fff;">Děkujeme za zpětnou vazbu</span></div></div>';
+        
+        fetch('/api/hodnotit', {
+            method: 'POST', 
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'uid=' + encodeURIComponent(currentUid) + '&stars=' + encodeURIComponent(starsPayload)
+        }).then(() => {
+            setTimeout(() => { resetState(); }, 2000); 
+        });
+    }
+
+    function resetState() {
+        lastId = -1; 
+        currentUid = ""; 
+        selectedStarsCurrent = 0; 
+        multiRatings = {};
+        isInteracting = false;
+        fetch('/api/clear');
+    }
+
+    function renderRating(osloveni, jidlo) {
+        document.getElementById('main').innerHTML = `
+            <div class="rating-area">
+                <div class="greeting" style="font-size:5.5vw;">Ahoj ${osloveni}!</div>
+                <div class="rating-step">Jak ti chutnalo: ${jidlo}?</div>
+                <div class="stars">
+                    <div class="star" id="star1" onclick="selectStars(1)">☆</div>
+                    <div class="star" id="star2" onclick="selectStars(2)">☆</div>
+                    <div class="star" id="star3" onclick="selectStars(3)">☆</div>
+                    <div class="star" id="star4" onclick="selectStars(4)">☆</div>
+                    <div class="star" id="star5" onclick="selectStars(5)">☆</div>
+                </div>
+                <button class="btn-submit" id="btnSubmit" onclick="handleRatingSubmit()">ODESLAT HODNOCENÍ</button>
+            </div>`;
+    }
+
+    function renderMultiRating(osloveni, jidloNazev, subItemsStr) {
+        let items = (subItemsStr || "").split(',').map(s => s.trim()).filter(s => s.length > 0);
+        
+        multiRatings = {};
+        items.forEach(it => multiRatings[it] = null);
+
+        let html = `
+            <div class="rating-area" style="width:90%; max-height:85vh;">
+                <div class="greeting" style="font-size:5vw; margin-bottom:0.5vh;">Ahoj ${osloveni}!</div>
+                <div class="rating-step" style="font-size:3.2vw; margin-bottom:1.5vh;">Jak ti chutnalo: ${jidloNazev}?</div>
+        `;
+
+        items.forEach((item, idx) => {
+            html += `
+                <div style="background:rgba(255,255,255,0.08); margin:1vh 0; padding:1.2vh 2vw; border-radius:12px; display:flex; align-items:center; justify-content:space-between;">
+                    <div style="font-size:3vw; font-weight:bold; width:30%; text-align:left;">${item}</div>
+                    <div style="display:flex; justify-content:center; gap:1.5vw; font-size:6.5vw; cursor:pointer; user-select:none; width:45%;" id="stars_container_${idx}">
+                        <span class="star" id="star_${idx}_1" onclick="selectMultiStar('${item}', ${idx}, 1)">☆</span>
+                        <span class="star" id="star_${idx}_2" onclick="selectMultiStar('${item}', ${idx}, 2)">☆</span>
+                        <span class="star" id="star_${idx}_3" onclick="selectMultiStar('${item}', ${idx}, 3)">☆</span>
+                        <span class="star" id="star_${idx}_4" onclick="selectMultiStar('${item}', ${idx}, 4)">☆</span>
+                        <span class="star" id="star_${idx}_5" onclick="selectMultiStar('${item}', ${idx}, 5)">☆</span>
+                    </div>
+                    <button type="button" id="btn_nemel_${idx}" onclick="setNemel('${item}', ${idx})" style="font-size:2.2vw; padding:1vh 2vw; background:#444; color:white; border:2px solid #666; border-radius:8px; cursor:pointer; font-weight:bold; width:22%;">NEMĚL/A</button>
+                </div>
+            `;
+        });
+
+        html += `
+                <button class="btn-submit" id="btnSubmit" onclick="handleRatingSubmit()" style="margin-top:2vh;">ODESLAT HODNOCENÍ</button>
+            </div>
+        `;
+
+        document.getElementById('main').innerHTML = html;
+    }
+
+    setInterval(() => {
+        if(isInteracting) return; 
+
+        fetch('/api/stav')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('meal-name').innerText = data.jidlo.toUpperCase();
+                
+                let title = "🍕 VÝDEJ JÍDLA";
+                if (data.rezim === "HODNOCENI") title = "⭐ HODNOCENÍ JÍDLA";
+                if (data.rezim === "NORMAL") title = "⚙️ BĚŽNÝ PROVOZ";
+                document.getElementById('mode-title').innerText = title;
+
+                if(data.id !== lastId) {
+                    lastId = data.id; 
+                    currentUid = data.uid; 
+                    selectedStarsCurrent = 0;
+                    multiRatings = {};
+                    
+                    let main = document.getElementById('main');
+                    
+                    if (data.rezim === "NORMAL") {
+                        main.innerHTML = `<div class="idle-text">ČTEČKA JE V BĚŽNÉM REŽIMU NORMAL<br><span style="font-size:3.5vw; color:#aaa;">Tablet slouží pouze jako náhled</span></div>`;
+                        document.body.style.background = "#121212";
+                        return;
+                    }
+
+                    if(data.uid === "") {
+                        main.innerHTML = `<div class="idle-text">${data.rezim === "VYDEJ" ? "PŘILOŽ SVŮJ ČIP!" : "OHODNOŤ JÍDLO<br><span style='font-size:3.5vw'>Přilož svůj čip</span>"}</div>`;
+                        document.body.style.background = "#121212";
+                    } else if (data.isfound === false) {
+                         document.body.style.background = "#b71c1c";
+                         if (data.rezim === "VYDEJ") {
+                             main.innerHTML = `<div class="rating-area"><div class="thanks" style="color:#fff;">VÝDEJ ZAMÍTNUT<br><span style="font-size:4.5vw; color:#ffcccc;">Neznámá karta</span></div></div>`;
+                         } else {
+                             main.innerHTML = `<div class="rating-area"><div class="thanks" style="color:#fff;">NELZE HODNOTIT<br><span style="font-size:4.5vw; color:#ffcccc;">Neznámá karta</span></div></div>`;
+                         }
+                         isInteracting = true;
+                         setTimeout(() => { resetState(); }, 3000);
+                    } else {
+                        let bgColor = "#121212"; 
+                        if(data.barva === "Zelena") bgColor = "#0e3a15";
+                        if(data.barva === "Modra") bgColor = "#0d204a";
+                        if(data.barva === "Ruzova") bgColor = "#4a0d33";
+                        if(data.barva === "Oranzova") bgColor = "#613105";
+                        if(data.barva === "Zluta") bgColor = "#4a410d";
+                        document.body.style.background = bgColor;
+
+                        if(data.rezim === "VYDEJ") {
+                            // Načtení fotky podle ID osoby (např. 1.jpg, 2.jpg)
+                            let photoUrl = '/fotky/' + data.user_id + '.jpg';
+                            
+                            // Kontrola alergie
+                            let alergieVal = (data.alergie || "").trim().toLowerCase();
+                            let maAlergii = !(alergieVal === "zadna" || alergieVal === "bez_omezeni" || alergieVal === "žádná" || alergieVal === "-" || alergieVal === "");
+                            
+                            let html = `<div class="photo-area"><img src="${photoUrl}" onerror="this.style.display='none'"></div>
+                                        <div class="info-area">
+                                            <div class="greeting">Ahoj ${data.osloveni}!</div>
+                                            <div class="team">Oddíl: ${data.oddil}</div>`;
+                            
+                            if(maAlergii) {
+                                html += `<div class="diet-warning">POZOR ALERGIE: ${data.alergie}</div><br>`;
+                            } else {
+                                html += `<div class="status-msg" style="background:#4CAF50;">DOBROU CHUŤ!</div><br>`;
+                            }
+
+                            if(data.stav === "PRIDAVEK") {
+                                html += `<div class="status-msg" style="background:#F57C00;">TOTO JE PŘÍDAVEK!</div><br>`;
+                            }
+
+                            html += `<div class="portion-counter">Vydáno celkem: <b>${data.porce_celkem} porcí</b></div>`;
+                            html += `</div>`;
+                            main.innerHTML = html;
+
+                        } else if(data.rezim === "HODNOCENI") {
+                            if (data.stav_hodnoceni === "HODNOTIL") {
+                                main.innerHTML = `<div class="rating-area"><div class="thanks" style="color:#ff9800;">TOTO JÍDLO UŽ JSI HODNOTIL/A.<br><span style="font-size:4.5vw; color:#fff;">Děkujeme!</span></div></div>`;
+                                isInteracting = true;
+                                setTimeout(() => { resetState(); }, 3000);
+                            } else {
+                                if (data.jidlo_typ === "5") {
+                                    renderMultiRating(data.osloveni, data.jidlo, data.jidlo_subitems);
+                                } else {
+                                    renderRating(data.osloveni, data.jidlo);
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+            .catch(err => console.log("Čekám na ESP32..."));
+    }, 500);
+</script>
+</body>
+</html>
