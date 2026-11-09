@@ -1,80 +1,80 @@
-# Autonomní Systém RFID Čteček
+# Autonomous RFID Reader System
 
-Tento projekt byl vyvinut jako funkční **prototyp (demo)** a zážitkový prvek pro dětský tábor s tematikou vesmírné společnosti. Hlavním cílem bylo navodit interaktivní „high-tech“ atmosféru, doprovázet celotáborovou hru a nabídnout dětem zážitek z personalizované interakce – čtečky reagují na jejich jméno na OLED displeji a při výdeji jídel zobrazují jejich „profil táborníka“ na tabletu.
+This project was developed as a functional **prototype (demo)** and an interactive feature for a children's summer camp themed around a space corporation. The main goal was to create an interactive "high-tech" atmosphere, complement the camp-wide game, and provide campers with a personalized interactive experience—the readers address them by name on an integrated OLED display and display their "camper profile" on a tablet during meal distribution.
 
-Projekt slouží jako ověřený koncept (PoC), který řeší náročné terénní podmínky a poskytuje modularitu pro rozšiřování v dalších letech.
-
----
-
-## Přehled Projektu a Architektonická Rozhodnutí
-
-Zařízení bylo navrženo pro bezproblémový provoz v terénu bez dostupné infrastrukturní sítě a s ohledem na snadnou obsluhu přes mobilní telefon.
-
-### 1. Řešení Absence Síťové Infrastruktury (Offline-First)
-* **Problém:** V místě konání tábora není k dispozici internet, LAN síť ani standardní Wi-Fi routery.
-* **Řešení:** Čtečky fungují v režimu **Offline-first**. Všechna data (databáze účastníků, harmonogram jídel, herní nápovědy a provozní logy) jsou uložena lokálně na SD kartách přímo v zařízeních.
-* **Peer-to-Peer Komunikace:** Pro kritickou synchronizaci mezi stanovišti (např. globální stav herní poruchy) využívají čtečky bezdrátový protokol **ESP-NOW**, který funguje přímým spojením mezi čipy bez nutnosti přístupového bodu. To však bylo použito spíše pro testování dosahu a na použité vzdálenosti to nebylo úplně spolehlivé.
-
-### 2. Energetická Autonomie
-* **Problém:** Absence elektrických zásuvek na stanovištích v lese a na louce.
-* **Řešení:** Komponenty a mikrokontrolery ESP32 byly optimalizovány na nízký odběr proudu, což umožňuje celodenní provoz zařízení napájených pouze z běžných powerbank.
-
-### 3. Vzdálená Správa z Mobilního Telefonu
-* **Problém:** Nutnost upravovat konfigurace, měnit šablony nebo stahovat logy bez nutnosti rozebírat krabičky a vyndávat SD karty.
-* **Řešení:** Každá čtečka vytváří vlastní Wi-Fi Access Point (AP) a běží na ní asynchronní webový server (`ESPAsyncWebServer`). Organizátor se připojí smartphonem k webovému rozhraní, kde může:
-  * Nahrávat a spravovat soubory na SD kartě (CSV databáze, fotky).
-  * Synchronizować přesný čas systémových hodin (RTC) podle mobilu.
-  * Měnit provozní režimy a upravovat textové šablony pro OLED displej.
-
-### 4. Interaktivní Kioskové Rozhraní na Tabletu
-* **Problém:** Děti lépe vnímají vizuální odezvu na větší obrazovce než na malém integrovaném OLED displeji čtečky.
-* **Řešení:** Kuchyňská čtečka poskytuje přes lokální Wi-Fi webové rozhraní pro tablet. Při přiložení RFID čipu se na tabletu zobrazí:
-  * Osobní „profil táborníka“ s fotografií, jménem a příslušností k oddílu.
-  * Zvýraznění alergií a dietních omezení.
-  * Počítadlo vydaných porcí a automatická detekce nároku na přídavek.
-  * Hvězdičkové hodnocení jídel s okamžitým ukládáním zpětné vazby.
+The project serves as a proof of concept (PoC) designed to operate under demanding field conditions while offering modularity for future expansion.
 
 ---
 
-## Použité Technologie a Hardware
+## Project Overview & Architectural Decisions
+
+The hardware and software were designed for seamless field operation without reliance on infrastructure networks, with an emphasis on easy administration via mobile devices.
+
+### 1. Offline-First Approach (No Network Infrastructure)
+* **Challenge:** The camp site lacks internet access, local area networks (LAN), and standard Wi-Fi routers.
+* **Solution:** Readers operate on an **offline-first** architecture. All data (camper database, meal schedules, game hints, and operational logs) are stored locally on SD cards directly inside each device.
+* **Peer-to-Peer Communication:** For critical synchronization between stations (e.g., global game status/outages), the devices utilize the **ESP-NOW** wireless protocol, enabling direct chip-to-chip communication without an access point. (Note: This feature was primarily used to test range limitations and proved somewhat unreliable across longer distances in terrain).
+
+### 2. Power Autonomy
+* **Challenge:** Absence of electrical outlets at remote forest and meadow locations.
+* **Solution:** Hardware components and the ESP32 microcontrollers were optimized for low power consumption, allowing full-day operation powered solely by standard consumer power banks.
+
+### 3. Remote Mobile Management
+* **Challenge:** The need to update configurations, change templates, or retrieve logs without disassembling enclosures or removing SD cards.
+* **Solution:** Each reader creates its own Wi-Fi Access Point (AP) and hosts an asynchronous web server (`ESPAsyncWebServer`). Camp staff can connect via smartphone to an intuitive web interface to:
+  * Upload and manage files on the SD card (CSV databases, images).
+  * Synchronize real-time clock (RTC) system time directly with the phone.
+  * Switch operational modes and modify text display templates for the OLED screen.
+
+### 4. Interactive Tablet Kiosk Interface
+* **Challenge:** Children engage much better with visual feedback on a larger screen than on a small embedded OLED display.
+* **Solution:** The kitchen reader hosts a local web interface accessible via Wi-Fi from a tablet. Swiping an RFID tag triggers the tablet display to show:
+  * A personal "camper profile" featuring a photo, name, and assigned squad/team.
+  * Visual highlights for allergies and dietary restrictions.
+  * Served portion counters with automatic detection for second-helping eligibility.
+  * An interactive star-rating system for meals with real-time feedback logging.
+
+---
+
+## Hardware & Technology Stack
 
 ### Hardware
-* **Řídící jednotka:** ESP32 (Wi-Fi, ESP-NOW, více jáder)
-* **RFID Modul:** MFRC522 (13.56 MHz)
-* **Integrovaný displej:** OLED SH1106G (128x64 px, I2C)
-* **Hodiny reálného času (RTC):** DS1302 (zálohované baterií pro uchování času)
-* **Úložiště:** SD modul (SPI bus) + interní flash paměť (LittleFS pro statický web)
-* **Periferie:** RGB LED pásek (NeoPixel WS2812B), akustický bzučák, maticová klávesnice 4x4
+* **Microcontroller:** ESP32 (Wi-Fi, ESP-NOW, Dual-Core)
+* **RFID Module:** MFRC522 (13.56 MHz)
+* **Integrated Display:** OLED SH1106G (128x64 px, I2C)
+* **Real-Time Clock (RTC):** DS1302 (Battery-backed for accurate timekeeping)
+* **Storage:** MicroSD Card Module (SPI bus) + Internal Flash (LittleFS for static web assets)
+* **Peripherals:** RGB LED Strip (NeoPixel WS2812B), Piezo Buzzer, 4x4 Matrix Keypad
 
-### Softwarový Stack
-* **Jazyk:** C++ / Arduino Framework pro ESP32
+### Software Stack
+* **Programming Language:** C++ / Arduino Framework for ESP32
 * **Web Server & Backend:** `ESPAsyncWebServer`, `AsyncTCP`
-* **Frontend:** HTML5, CSS3, JavaScript (ES6+, Fetch API, polling)
-* **Datový Formát:** CSV pro lokální databáze na SD kartě, JSON pro API komunikaci
+* **Frontend:** HTML5, CSS3, JavaScript (ES6+, Fetch API, Polling)
+* **Data Formats:** CSV for local databases on SD cards, JSON for REST API communication
 
 ---
 
-## Architektura Kódu a Struktura Repozitáře
+## Code Architecture & Repository Structure
 
-* **`libraries/ReaderCore/`** – Sdílené jádro systému. Zapouzdřuje hardware (RFID, OLED, RTC, SD karty, NeoPixel), spravuje REST API, parsuje CSV a zajišťuje komunikaci přes ESP-NOW.
-* **`ReKitchen/`** – Aplikace pro kuchyňské stanoviště. Zpracovává režimy Výdej a Hodnocení a komunikuje s tabletem přes webové rozhraní.
-* **`ReMain/`** – Hlavní řídící čtečka s klávesnicí. Slouží k zadávání PIN kódů, řešení herních poruchových stavů a řízení mechaniky celotáborové hry.
-* **`ReKon/`** – Standardní čtečka určená pro běžná táborová stanoviště.
-
----
-
-## Datová Rozhraní a Soubory
-
-1. `users.csv` – Databáze účastníků (`id;rfidUid;firstName;lastName;...;teamId;role;diet`)
-2. `jidla.csv` – Seznam a harmonogram jídel pro výdej a hodnocení.
-3. `display_cfg.txt` – Konfigurace textových šablon pro OLED displej s dynamickými značkami (např. `{OSLOVENI}`, `{ODDIL}`).
-4. `log_<READER_ID>.csv` – Auditní záznamy o přiložení karet a herních akcích.
-5. `hodnoceni.csv` – Záznamy hodnocení strava z tabletu.
+* **`libraries/ReaderCore/`** – Shared system core library. Encapsulates hardware drivers (RFID, OLED, RTC, SD, NeoPixel), manages REST APIs, parses CSV files, and handles ESP-NOW messaging.
+* **`ReKitchen/`** – Application for the kitchen station. Handles Distribution (*Výdej*) and Rating (*Hodnocení*) modes while communicating with the tablet via the web interface.
+* **`ReMain/`** – Master control reader with keypad interface. Used for PIN entry, resolving game failure states, and controlling overarching game mechanics.
+* **`ReKon/`** – Standard station reader designed for general camp activity locations.
 
 ---
 
-## Potenciál pro Další Rozvoj
+## Data Interfaces & File Structures
 
-Jelikož je systém postaven na modularitě knihovny `ReaderCore`, v dalších letech je možné projekt rozšířit např. o:
-* Zavedení herního bodovacího systému a virtuální táborové měny.
-* Rozšíření interaktivních stanovišť s dalšími senzory a akčními členy.
+1. `users.csv` – Camper database (`id;rfidUid;firstName;lastName;...;teamId;role;diet`).
+2. `jidla.csv` – Schedule and details of meals for distribution and rating.
+3. `display_cfg.txt` – Text template configurations for the OLED display with dynamic placeholders (e.g., `{OSLOVENI}`, `{ODDIL}`).
+4. `log_<READER_ID>.csv` – Audit logs recording tag scans and game actions.
+5. `hodnoceni.csv` – Meal feedback and rating logs collected from the tablet interface.
+
+---
+
+## Future Roadmap & Enhancements
+
+Thanks to the modular design of the `ReaderCore` library, the system can be expanded in future iterations with features such as:
+* An integrated game scoring system and virtual camp currency.
+* Interactive activity stations expanded with additional sensors and physical actuators.
